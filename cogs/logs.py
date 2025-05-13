@@ -5,7 +5,7 @@ import datetime
 LOG_CHANNEL_NAME = "mod-logs"
 
 class ModLogs(commands.Cog):
-    """Logs moderation & member events to the #mod-logs channel."""
+    """Logs moderation, member, and audit log events to the #mod-logs channel."""
 
     def __init__(self, bot):
         self.bot = bot
@@ -131,6 +131,97 @@ class ModLogs(commands.Cog):
             timestamp=datetime.datetime.utcnow()
         )
         await log_channel.send(embed=embed)
+
+    # ========== AUDIT LOG EVENTS ==========
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        log_channel = await self.get_log_channel(after.guild)
+        # Nickname changes
+        if before.nick != after.nick:
+            embed = discord.Embed(
+                title="Nickname Changed",
+                description=f"{after.mention} changed nickname\n**Before:** {before.nick}\n**After:** {after.nick}",
+                color=0xff9900,
+                timestamp=datetime.datetime.utcnow()
+            )
+            await log_channel.send(embed=embed)
+        # Role changes
+        if set(before.roles) != set(after.roles):
+            before_roles = set(before.roles)
+            after_roles = set(after.roles)
+            added_roles = [role for role in after_roles - before_roles]
+            removed_roles = [role for role in before_roles - after_roles]
+            changes = ""
+            if added_roles:
+                changes += f"**Added Roles:** {', '.join(role.mention for role in added_roles)}\n"
+            if removed_roles:
+                changes += f"**Removed Roles:** {', '.join(role.mention for role in removed_roles)}\n"
+            if changes:
+                embed = discord.Embed(
+                    title="Roles Updated",
+                    description=f"{after.mention}\n{changes}",
+                    color=0xaaaa00,
+                    timestamp=datetime.datetime.utcnow()
+                )
+                await log_channel.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_guild_update(self, before, after):
+        log_channel = await self.get_log_channel(after)
+        changes = []
+        if before.name != after.name:
+            changes.append(f"**Server renamed:** `{before.name}` → `{after.name}`")
+        if before.icon != after.icon:
+            changes.append(f"**Server icon changed**")
+        if changes:
+            embed = discord.Embed(
+                title="Server Updated",
+                description="\n".join(changes),
+                color=0x00ffcc,
+                timestamp=datetime.datetime.utcnow()
+            )
+            await log_channel.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_guild_role_create(self, role):
+        log_channel = await self.get_log_channel(role.guild)
+        embed = discord.Embed(
+            title="Role Created",
+            description=f"Role {role.mention} was created.",
+            color=0xdddd00,
+            timestamp=datetime.datetime.utcnow()
+        )
+        await log_channel.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_guild_role_delete(self, role):
+        log_channel = await self.get_log_channel(role.guild)
+        embed = discord.Embed(
+            title="Role Deleted",
+            description=f"Role `{role.name}` was deleted.",
+            color=0xff8800,
+            timestamp=datetime.datetime.utcnow()
+        )
+        await log_channel.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_guild_role_update(self, before, after):
+        log_channel = await self.get_log_channel(after.guild)
+        changes = []
+        if before.name != after.name:
+            changes.append(f"**Role renamed:** `{before.name}` → `{after.name}`")
+        if before.color != after.color:
+            changes.append(f"**Role color changed**")
+        if before.permissions != after.permissions:
+            changes.append(f"**Role permissions changed**")
+        if changes:
+            embed = discord.Embed(
+                title="Role Updated",
+                description="\n".join(changes),
+                color=0xccff00,
+                timestamp=datetime.datetime.utcnow()
+            )
+            await log_channel.send(embed=embed)
 
 def setup(bot):
     bot.add_cog(ModLogs(bot))
